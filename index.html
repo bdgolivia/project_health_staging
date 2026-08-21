@@ -216,8 +216,14 @@
     <span class="sortsel"><span id="sort-label"></span>
       <select id="sort-by" onchange="sortBy = this.value; render()"></select></span>
     <button id="btn-bulk" class="ghost" style="display:none" onclick="confirmAllReady()"></button>
-    <span id="bulk-admin" style="display:none; gap:8px; align-items:center;">
+    <!-- Auswahl-Aktionen, die jeder PL braucht. Die Admin-Leiste daneben
+         bleibt auf Zuweisen und Ausschliessen beschraenkt. -->
+    <span id="bulk-common" style="display:none; gap:8px; align-items:center;">
       <button class="quiet" id="bulk-selall" onclick="selectAllVisible()"></button>
+      <button id="bulk-confirm" onclick="confirmBulk()"></button>
+      <button id="bulk-skip" class="quiet" onclick="skipBulk()"></button>
+    </span>
+    <span id="bulk-admin" style="display:none; gap:8px; align-items:center;">
       <select id="bulk-pl" style="width:auto;min-width:200px"></select>
       <button id="bulk-assign" onclick="assignBulk()">Zuweisen</button>
       <button id="bulk-exclude" class="danger" onclick="excludeBulk()">Ausschließen</button>
@@ -309,7 +315,24 @@ const TEXTS = {
     allDone: 'Alles erledigt – alle deine Projekte sind für „{label}" bestätigt oder ausgesetzt. Danke!',
     noRoundHint: 'Keine aktive Runde.', startRoundHint: ' Starte oben rechts eine neue Runde.',
     contacts: 'Kontakt', contactsPl: 'Kontakte', paused: 'pausiert',
-    tagExcludedC: 'ausgeschlossen', tagConfirmed: 'bestätigt', tagAutoPl: 'PL automatisch — bitte prüfen', tagOrphan: 'PL ausgeschieden', tagSkipped: 'ausgesetzt', tagOpen: 'offen',
+    tagExcludedC: 'ausgeschlossen', tagConfirmed: 'bestätigt',
+    stopMenu: 'Nicht mehr befragen …',
+    stopPause: 'Vorerst pausieren',
+    stopPauseHint: 'Bleibt liegen, kommt nächste Runde wieder zur Prüfung.',
+    stopFinished: 'Projekt ist beendet',
+    stopFinishedHint: 'Wird zur Schließung in ZEP gemeldet und bis dahin nicht befragt.',
+    stopExcludeHint: 'Dauerhaft raus, z. B. reine Abrechnungsprojekte.',
+    askFinished: 'Das Projekt wird zur Schließung in ZEP gemeldet und bis dahin nicht mehr befragt.\n\nWarum ist es beendet?',
+    tFinished: 'Als beendet gemeldet',
+    bulkConfirm: 'Bestätigen', bulkSkip: 'Runde aussetzen',
+    selectFirst: 'Bitte zuerst Projekte auswählen.',
+    nothingPending: 'In der Auswahl ist nichts offen.',
+    confirmBulkAsk: '{n} von {sel} ausgewählten Projekten bestätigen?',
+    confirmBulkNoContacts: 'Achtung: bei {n} davon sind keine Kontakte hinterlegt.',
+    skipBulkAsk: '{n} von {sel} ausgewählten Projekten für diese Runde aussetzen?',
+    skipBulkWarn: 'Das sind {n} Projekte auf einmal — bitte kurz prüfen.',
+    askSkipBulk: 'Begründung für alle {n} Projekte:',
+    tConfirmedN: '{n} Projekte bestätigt', tSkippedN: '{n} Projekte ausgesetzt', tagAutoPl: 'PL automatisch — bitte prüfen', tagOrphan: 'PL ausgeschieden', tagSkipped: 'ausgesetzt', tagOpen: 'offen',
     pausedLine: 'Ausgesetzt: {reason}', excludedLine: 'Dauerhaft ausgeschlossen: {reason}',
     noContactsYet: 'Noch keine Kontakte hinterlegt.',
     copyFrom: 'Kontakte aus anderem Projekt übernehmen …',
@@ -408,7 +431,24 @@ const TEXTS = {
     allDone: 'All done – all your projects are confirmed or skipped for „{label}". Thank you!',
     noRoundHint: 'No active round.', startRoundHint: ' Start a new round in the top right.',
     contacts: 'contact', contactsPl: 'contacts', paused: 'paused',
-    tagExcludedC: 'excluded', tagConfirmed: 'confirmed', tagAutoPl: 'PL auto-assigned — please check', tagOrphan: 'PL has left', tagSkipped: 'skipped', tagOpen: 'open',
+    tagExcludedC: 'excluded', tagConfirmed: 'confirmed',
+    stopMenu: 'Stop surveying …',
+    stopPause: 'Pause for now',
+    stopPauseHint: 'Stays on hold, comes up again next round.',
+    stopFinished: 'Project is finished',
+    stopFinishedHint: 'Reported for closing in ZEP, not surveyed until then.',
+    stopExcludeHint: 'Permanently out, e.g. pure billing projects.',
+    askFinished: 'The project will be reported for closing in ZEP and will not be surveyed until then.\n\nWhy is it finished?',
+    tFinished: 'Reported as finished',
+    bulkConfirm: 'Confirm', bulkSkip: 'Skip this round',
+    selectFirst: 'Please select projects first.',
+    nothingPending: 'Nothing pending in the selection.',
+    confirmBulkAsk: 'Confirm {n} of {sel} selected projects?',
+    confirmBulkNoContacts: 'Note: {n} of them have no contacts.',
+    skipBulkAsk: 'Skip {n} of {sel} selected projects for this round?',
+    skipBulkWarn: 'That is {n} projects at once — please double-check.',
+    askSkipBulk: 'Reason for all {n} projects:',
+    tConfirmedN: '{n} projects confirmed', tSkippedN: '{n} projects skipped', tagAutoPl: 'PL auto-assigned — please check', tagOrphan: 'PL has left', tagSkipped: 'skipped', tagOpen: 'open',
     pausedLine: 'Paused: {reason}', excludedLine: 'Permanently excluded: {reason}',
     noContactsYet: 'No contacts added yet.',
     copyFrom: 'Copy contacts from another project …',
@@ -677,13 +717,26 @@ function render() {
     contacts: (a, b2) => activeLinks(a.id).length - activeLinks(b2.id).length || cmpNr(a, b2),
   }[sortBy] || cmpNr;
   list = [...list].sort(cmp);
-  // Admin-Massenzuweisung
+  // Massenaktionen. bulk-common gilt fuer alle Rollen, bulk-admin zusaetzlich
+  // nur fuer Admins. In den Tabs "Fortschritt" und "Ausgeschlossen" gibt es
+  // nichts sinnvoll zu bestaetigen oder auszusetzen.
+  const bc = $('bulk-common');
+  const bulkSinnvoll = canEdit() && step !== 'excluded' && step !== 'progress';
+  if (bulkSinnvoll) {
+    bc.style.display = 'inline-flex';
+    const n = selIds.size;
+    setTxt('bulk-selall', t('selectAll'));
+    setTxt('bulk-confirm', n ? `${t('bulkConfirm')} (${n})` : t('bulkConfirm'));
+    setTxt('bulk-skip', n ? `${t('bulkSkip')} (${n})` : t('bulkSkip'));
+    setDisp('bulk-confirm', wave ? '' : 'none');
+    setDisp('bulk-skip', wave ? '' : 'none');
+  } else { bc.style.display = 'none'; }
+
   const ba = $('bulk-admin');
   if (isAdmin()) {
     ba.style.display = 'inline-flex';
     $('bulk-pl').innerHTML = `<option value="">${t('choosePL')}</option>` +
       users.map(u => `<option value="${u.id}">${esc(u.name)}</option>`).join('');
-    setTxt('bulk-selall', t('selectAll'));
     setTxt('bulk-assign', selIds.size ? `${t('assign')} (${selIds.size})` : t('assign'));
     setTxt('bulk-exclude', selIds.size ? `${t('exclude')} (${selIds.size})` : t('exclude'));
     setDisp('bulk-exclude', step === 'excluded' ? 'none' : '');
@@ -800,14 +853,24 @@ function card(p) {
           ? `${(wave && wp && wp.review_status === 'pending')
                ? `<button onclick="keepPaused('${wp.id}')">${t('keepPaused')}</button>` : ''}
              <button class="ghost" onclick="resume('${p.id}')">${t('resume')}</button>`
-          : `<button class="quiet" onclick="pause('${p.id}')">${t('pause')}</button>`}
+          : ''}
         ${wave && wp && wp.review_status === 'pending' && !p.survey_paused ? `
           <button onclick="confirmProject('${wp.id}','${p.id}')">${t('confirmProject')}</button>
           <button class="quiet" onclick="skipProject('${wp.id}')">${t('skipProject')}</button>` : ''}
         ${wave && wp && wp.review_status !== 'pending' ? `
           <button class="quiet" onclick="reopenProject('${wp.id}')">${t('reopen')}</button>` : ''}
-        ${isAdmin() ? `<button class="danger" onclick="excludeProject('${p.id}')">${t('excludePerm')}</button>` : ''}
+        ${p.survey_paused ? '' : `
+        <button class="quiet" onclick="toggleStop('${p.id}', event)">${t('stopMenu')}</button>`}
         `)}
+        ${!canEdit() || p.survey_excluded || p.survey_paused ? '' : `
+        <div class="stopmenu" id="stop-${p.id}" style="display:none">
+          <button class="quiet" onclick="pause('${p.id}')">${t('stopPause')}</button>
+          <span class="hint">${t('stopPauseHint')}</span>
+          <button class="quiet" onclick="reportFinished('${p.id}')">${t('stopFinished')}</button>
+          <span class="hint">${t('stopFinishedHint')}</span>
+          ${isAdmin() ? `<button class="danger" onclick="excludeProject('${p.id}')">${t('excludePerm')}</button>
+          <span class="hint">${t('stopExcludeHint')}</span>` : ''}
+        </div>`}
         ${!canEdit() ? '' : `
         <select id="tr-${p.id}">
             <option value="">${p.pl_user_id ? t('transferTo') : t('assignTo')}</option>
@@ -900,6 +963,70 @@ async function transfer(pid) {
   // durch die Uebergabe selbst nicht mehr sehen darf
   const { error } = await db.rpc('assign_projects', { p_projects: [pid], p_to: to });
   error ? toast(error.message, true) : toast(t('tTransferred', {name: u.name}));
+  await reload();
+}
+
+/* --------- Karten-Menue "Nicht mehr befragen" --------- */
+function toggleStop(pid, ev) {
+  if (ev) ev.stopPropagation();
+  const box = $('stop-' + pid);
+  if (!box) return;
+  const auf = box.style.display !== 'none';
+  // immer nur eines offen, sonst wird die Liste unruhig
+  document.querySelectorAll('.stopmenu').forEach(b => { b.style.display = 'none'; });
+  box.style.display = auf ? 'none' : 'grid';
+}
+
+async function reportFinished(pid) {
+  const reason = prompt(t('askFinished'));
+  if (reason === null) return;
+  const { error } = await db.rpc('report_project_finished', { p_project: pid, p_reason: reason });
+  error ? toast(error.message, true) : toast(t('tFinished'));
+  await reload();
+}
+
+/* --------- Massenaktionen fuer alle Rollen --------- */
+// Beide arbeiten nur auf Projekten, die in der laufenden Runde wirklich
+// offen sind. Ohne diese Einschraenkung wuerde ein Klick auch schon
+// bestaetigte Projekte zurueckwerfen.
+function pendingAusAuswahl() {
+  return [...selIds]
+    .map(id => ({ id, wp: wpOf(id), p: projects.find(x => x.id === id) }))
+    .filter(x => x.wp && x.wp.review_status === 'pending' && x.p && !x.p.survey_excluded);
+}
+
+async function confirmBulk() {
+  if (!selIds.size) return toast(t('selectFirst'), true);
+  const kandidaten = pendingAusAuswahl().filter(x => !x.p.survey_paused);
+  if (!kandidaten.length) return toast(t('nothingPending'), true);
+  const ohneKontakt = kandidaten.filter(x => activeLinks(x.id).length === 0).length;
+  let frage = t('confirmBulkAsk', { n: kandidaten.length, sel: selIds.size });
+  if (ohneKontakt) frage += '\n\n' + t('confirmBulkNoContacts', { n: ohneKontakt });
+  if (!confirm(frage)) return;
+  const { error } = await db.from('wave_projects')
+    .update({ review_status: 'confirmed', confirmed_by: me.id })
+    .in('id', kandidaten.map(x => x.wp.id));
+  error ? toast(error.message, true) : toast(t('tConfirmedN', { n: kandidaten.length }));
+  selIds.clear();
+  await reload();
+}
+
+async function skipBulk() {
+  if (!selIds.size) return toast(t('selectFirst'), true);
+  const kandidaten = pendingAusAuswahl();
+  if (!kandidaten.length) return toast(t('nothingPending'), true);
+  let frage = t('skipBulkAsk', { n: kandidaten.length, sel: selIds.size });
+  // Kleine Reibung an der richtigen Stelle: "alle auswaehlen" + "aussetzen"
+  // leert sonst eine Runde in zwei Klicks, ohne dass es jemand merkt.
+  if (kandidaten.length > 10) frage += '\n\n' + t('skipBulkWarn', { n: kandidaten.length });
+  if (!confirm(frage)) return;
+  const reason = prompt(t('askSkipBulk', { n: kandidaten.length }));
+  if (reason === null) return;
+  const { error } = await db.from('wave_projects')
+    .update({ review_status: 'skipped', skipped_reason: reason || null, confirmed_by: me.id })
+    .in('id', kandidaten.map(x => x.wp.id));
+  error ? toast(error.message, true) : toast(t('tSkippedN', { n: kandidaten.length }));
+  selIds.clear();
   await reload();
 }
 

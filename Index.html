@@ -1,0 +1,1224 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>bdg · Project Health – Kontakte</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<style>
+  .env-banner {
+    position: sticky; top: 0; z-index: 100; text-align: center;
+    font-weight: 700; letter-spacing: 1px; font-size: 13px; padding: 8px 12px;
+    color: #0b0b0b;
+    background: repeating-linear-gradient(-45deg, #C8D400 0 18px, #a8b300 18px 36px);
+  }
+  :root {
+    --bg: #0b0b0b; --panel: #141414; --panel-2: #1c1c1c; --line: #2a2a2a;
+    --text: #f2f2f2; --muted: #9a9a9a; --pear: #C8D400; --danger: #e05252; --ok: #7fbf3f;
+  }
+  * { box-sizing: border-box; border-radius: 0 !important; }
+  html, body { margin: 0; background: var(--bg); color: var(--text);
+    font-family: 'Roboto', sans-serif; font-size: 15px; line-height: 1.45; }
+  a { color: var(--pear); }
+  #login { min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+  .login-card { width: min(420px, 92vw); border: 1px solid var(--line); background: var(--panel); padding: 36px; }
+  .wordmark { font-weight: 700; font-size: 22px; letter-spacing: .5px; }
+  .wordmark b { color: var(--pear); }
+  .login-card p { color: var(--muted); }
+  input, select {
+    width: 100%; background: var(--panel-2); border: 1px solid var(--line);
+    color: var(--text); padding: 10px 12px; font: inherit; outline: none;
+  }
+  input:focus, select:focus { border-color: var(--pear); }
+  button {
+    font: inherit; font-weight: 500; cursor: pointer; border: 1px solid var(--pear);
+    background: var(--pear); color: #0b0b0b; padding: 10px 16px;
+  }
+  button.ghost { background: transparent; color: var(--pear); }
+  button.quiet { background: transparent; color: var(--muted); border-color: var(--line); }
+  button.danger { background: transparent; color: var(--danger); border-color: var(--danger); }
+  button:disabled { opacity: .45; cursor: default; }
+  .stack > * + * { margin-top: 12px; }
+
+  #app { display: none; max-width: 1080px; margin: 0 auto; padding: 0 20px 80px; }
+  header.top {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
+    padding: 22px 0 14px; border-bottom: 1px solid var(--line); flex-wrap: wrap;
+  }
+  header.top .who { color: var(--muted); font-size: 13px; }
+  header.top .who button { padding: 4px 10px; margin-left: 10px; }
+  .langsw { display: inline-flex; margin-left: 12px; border: 1px solid var(--line); }
+  .langsw button { padding: 3px 9px; font-size: 12px; background: transparent; color: var(--muted);
+    border: none; border-left: 1px solid var(--line); margin: 0; }
+  .langsw button:first-child { border-left: none; }
+  .langsw button.on { background: var(--pear); color: #0b0b0b; }
+  .login-card .langsw { margin: 0 0 4px; }
+
+  .intro { border: 1px solid var(--line); background: var(--panel); margin-top: 18px; }
+  .intro summary {
+    cursor: pointer; padding: 12px 16px; font-weight: 500; list-style: none;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .intro summary::-webkit-details-marker { display: none; }
+  .intro summary::after { content: '▾'; color: var(--muted); }
+  .intro[open] summary::after { content: '▴'; }
+  .intro .body { padding: 0 16px 16px; color: var(--muted); font-size: 14px; max-width: 780px; }
+  .intro .body b { color: var(--text); font-weight: 500; }
+  .intro ol { padding-left: 20px; margin: 10px 0; }
+  .intro li { margin-bottom: 6px; }
+  .roundbar { display: flex; align-items: center; justify-content: space-between; gap: 14px;
+    margin-top: 16px; flex-wrap: wrap; }
+  .roundbar .label { color: var(--muted); font-size: 13px; }
+  .roundbar .label b { color: var(--text); font-weight: 500; }
+  .coverage { flex: 1; min-width: 240px; }
+  .coverage .bar { height: 6px; background: var(--panel-2); position: relative; }
+  .coverage .bar i { position: absolute; inset: 0 auto 0 0; background: var(--pear); }
+  .coverage .legend { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); margin-top: 6px; }
+  .coverage .legend b { color: var(--text); font-weight: 500; }
+
+  nav.steps { display: flex; gap: 0; margin: 22px 0 0; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  nav.steps button {
+    background: transparent; border: none; border-bottom: 2px solid transparent;
+    color: var(--muted); padding: 12px 14px; font-weight: 500; display: flex; align-items: center; gap: 8px;
+  }
+  nav.steps button.active { color: var(--text); border-bottom-color: var(--pear); }
+  nav.steps .stepno {
+    font-family: 'Roboto Mono'; font-size: 12px; border: 1px solid var(--line);
+    padding: 1px 7px; color: var(--muted);
+  }
+  nav.steps button.done .stepno { border-color: var(--ok); color: var(--ok); }
+  nav.steps .count { color: var(--pear); font-family: 'Roboto Mono'; font-size: 13px; }
+  nav.steps .spacer { flex: 1; }
+  .stepintro { color: var(--muted); font-size: 14px; margin: 14px 0 4px; max-width: 760px; }
+  .toolbar { display: flex; gap: 10px; margin: 14px 0; flex-wrap: wrap; }
+  .toolbar input { max-width: 360px; }
+
+  .banner { border: 1px solid var(--pear); padding: 14px 16px; margin: 14px 0; }
+  .banner.ok { border-color: var(--ok); color: var(--ok); }
+  .banner .hint { color: var(--muted); }
+
+  .project { border: 1px solid var(--line); background: var(--panel); margin-bottom: 10px; }
+  .project.todo { border-left: 3px solid var(--pear); }
+  .project.paused { opacity: .7; }
+  .project.confirmed { border-left: 3px solid var(--ok); }
+  .project.skipped { opacity: .55; }
+  .p-head { display: flex; align-items: center; gap: 14px; padding: 14px 16px; cursor: pointer; }
+  .p-head .nr { color: var(--pear); font-family: 'Roboto Mono'; font-size: 13px; min-width: 86px; }
+  .p-head .name { flex: 1; min-width: 0; }
+  .p-head .name .cust { display: block; color: var(--muted); font-size: 13px; }
+  .p-head .meta { color: var(--muted); font-size: 13px; white-space: nowrap; }
+  .p-head .meta .n { color: var(--text); font-family: 'Roboto Mono'; }
+  .p-body { border-top: 1px solid var(--line); padding: 14px 16px; display: none; }
+  .project.open .p-body { display: block; }
+  .tag { font-size: 12px; padding: 2px 8px; border: 1px solid var(--line); color: var(--muted); }
+  .tag.ex { border-color: var(--danger); color: var(--danger); }
+  .tag.ok { border-color: var(--ok); color: var(--ok); }
+  .tag.pear { border-color: var(--pear); color: var(--pear); }
+
+  table.contacts { width: 100%; border-collapse: collapse; }
+  table.contacts td { padding: 8px 8px 8px 0; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  table.contacts td.mail { color: var(--muted); font-size: 13px; }
+  table.contacts td.actions { text-align: right; white-space: nowrap; }
+  table.contacts button { padding: 4px 10px; font-size: 13px; }
+
+  .copyrow { margin-top: 14px; border: 1px solid var(--line); padding: 10px 12px; }
+  .copyrow select { width: 100%; }
+  .copyrow .cand { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+  .copyrow .cand input { width: 16px; height: 16px; accent-color: var(--pear); }
+  .copyrow .cand .mail { color: var(--muted); font-size: 13px; }
+  .copyrow .foot { margin-top: 10px; display: flex; gap: 8px; align-items: center; }
+  .addrow { display: grid; grid-template-columns: 1fr 1fr 1.4fr auto; gap: 8px; margin-top: 14px; }
+  @media (max-width: 640px) { .addrow { grid-template-columns: 1fr; } }
+  .p-actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; align-items: center; }
+  .p-actions select { width: auto; min-width: 200px; }
+  .hint { color: var(--muted); font-size: 13px; }
+  .empty { color: var(--muted); padding: 30px 0; text-align: center; }
+
+  .p-head input.sel { width: 16px; height: 16px; accent-color: var(--pear); flex: none; cursor: pointer; }
+  table.progress { width: 100%; border-collapse: collapse; margin-top: 4px; }
+  table.progress th {
+    text-align: right; padding: 8px 10px; border-bottom: 1px solid var(--line);
+    color: var(--muted); font-weight: 500; font-size: 13px; cursor: pointer; white-space: nowrap;
+  }
+  table.progress th:first-child { text-align: left; }
+  table.progress th.sorted { color: var(--pear); }
+  table.progress td { text-align: right; padding: 9px 10px; border-bottom: 1px solid var(--line);
+    font-family: 'Roboto Mono'; font-size: 13px; }
+  table.progress td:first-child { text-align: left; font-family: 'Roboto', sans-serif; }
+  table.progress tr.row { cursor: pointer; }
+  table.progress tr.row:hover td { background: var(--panel-2); }
+  table.progress td.open-n { color: var(--pear); }
+  table.progress tr.done td.open-n { color: var(--ok); }
+  .sortsel { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
+  .sortsel select { width: auto; min-width: 190px; }
+  #toast {
+    position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%);
+    background: var(--pear); color: #0b0b0b; padding: 10px 18px; font-weight: 500;
+    display: none; z-index: 50; max-width: 90vw;
+  }
+  #toast.err { background: var(--danger); color: #fff; }
+</style>
+</head>
+<body>
+<div id="env-banner" class="env-banner" style="display:none"></div>
+
+<div id="login">
+  <div class="login-card stack">
+    <div class="wordmark">bdg<b>.</b> Project Health</div>
+    <div class="langsw" id="langsw-login"></div>
+    <p id="login-intro"></p>
+    <div id="step-email" class="stack">
+      <input id="email" type="email" placeholder="vorname@bdg.io" autocomplete="email">
+      <button id="btn-send" onclick="sendCode()">Anmeldecode senden</button>
+    </div>
+    <div id="step-code" class="stack" style="display:none">
+      <p id="code-sent"></p>
+      <input id="code" inputmode="numeric" placeholder="Code aus der E-Mail" maxlength="10">
+      <button id="btn-verify" onclick="verifyCode()"></button>
+      <button class="quiet" id="btn-other" onclick="backToEmail()"></button>
+    </div>
+    <p id="login-msg" class="hint"></p>
+  </div>
+</div>
+
+<div id="app">
+  <header class="top">
+    <div class="wordmark">bdg<b>.</b> Project Health</div>
+    <div class="who"><span id="who-name"></span><span class="langsw" id="langsw-app"></span><button class="quiet" id="btn-logout" onclick="logout()"></button></div>
+  </header>
+
+  <details class="intro" id="intro">
+    <summary id="intro-summary"></summary>
+    <div class="body" id="intro-body"></div>
+  </details>
+
+  <div class="roundbar">
+    <span class="label" id="round-label"></span>
+    <div class="coverage" id="coverage" style="display:none">
+      <div class="bar"><i id="cov-bar" style="width:0%"></i></div>
+      <div class="legend">
+        <span id="cov-l">…</span><span id="cov-r">…</span>
+      </div>
+    </div>
+    <button id="btn-close" style="display:none" class="quiet" onclick="closeRound()"></button>
+    <button id="btn-round" style="display:none" onclick="startRound()"></button>
+  </div>
+
+  <nav class="steps" id="steps"></nav>
+  <p class="stepintro" id="stepintro"></p>
+  <div id="round-banner"></div>
+  <div class="toolbar">
+    <input id="search" placeholder="Suchen … z.B.  kunde:siemens  projekt:support  nr:2026  pl:koch" oninput="render()">
+    <select id="pl-filter" style="display:none; width:auto; min-width:220px" onchange="onPlFilterChange()"></select>
+    <span class="sortsel"><span id="sort-label"></span>
+      <select id="sort-by" onchange="sortBy = this.value; render()"></select></span>
+    <button id="btn-bulk" class="ghost" style="display:none" onclick="confirmAllReady()"></button>
+    <span id="bulk-admin" style="display:none; gap:8px; align-items:center;">
+      <button class="quiet" id="bulk-selall" onclick="selectAllVisible()"></button>
+      <select id="bulk-pl" style="width:auto;min-width:200px"></select>
+      <button id="bulk-assign" onclick="assignBulk()">Zuweisen</button>
+      <button id="bulk-exclude" class="danger" onclick="excludeBulk()">Ausschließen</button>
+    </span>
+  </div>
+  <div id="list"></div>
+</div>
+
+<div id="toast"></div>
+<datalist id="contact-suggest"></datalist>
+
+<script>
+/* Konfiguration kommt aus config.js im selben Ordner (siehe README).
+   Live:    /config.js          -> Live-Supabase
+   Staging: /staging/config.js  -> Staging-Supabase
+   Diese Datei enthaelt bewusst KEINE Zugangsdaten und ist in beiden
+   Umgebungen identisch — Updates lassen sich komplett ersetzen. */
+const CFG = window.PROJECT_HEALTH_CONFIG || {};
+if (!CFG.supabaseUrl || !CFG.anonKey) {
+  document.body.innerHTML = '<div style="max-width:640px;margin:80px auto;padding:28px;'
+    + 'border:1px solid #e05252;color:#f2f2f2;font-family:Roboto,sans-serif">'
+    + '<h2 style="margin-top:0">Konfiguration fehlt</h2>'
+    + '<p>Im selben Ordner wie diese Seite muss eine <code>config.js</code> liegen mit:</p>'
+    + '<pre style="background:#1c1c1c;padding:12px;overflow:auto">window.PROJECT_HEALTH_CONFIG = {\n'
+    + '  supabaseUrl: "https://DEIN-PROJEKT.supabase.co",\n  anonKey: "eyJ..."\n};</pre></div>';
+  throw new Error('config.js fehlt oder unvollstaendig');
+}
+if (CFG.envLabel) {
+  const b = document.getElementById('env-banner');
+  b.textContent = CFG.envLabel; b.style.display = 'block';
+  document.title = '[' + CFG.envLabel.split('·')[0].trim() + '] ' + document.title;
+}
+const SUPABASE_URL = CFG.supabaseUrl;
+const ANON_KEY     = CFG.anonKey;
+
+
+/* ===================== SPRACHEN / LANGUAGES ===================== */
+const TEXTS = {
+  de: {
+    title: 'bdg · Project Health – Kontakte',
+    loginIntro: 'Kontakte für die Kundenzufriedenheitsbefragung pflegen. Anmeldung mit deiner bdg-E-Mail-Adresse.',
+    emailPh: 'vorname@bdg.io', sendCode: 'Anmeldecode senden',
+    codeSent: 'Wir haben dir einen Anmeldecode geschickt.',
+    codePh: 'Code aus der E-Mail', signIn: 'Anmelden', otherEmail: 'Andere E-Mail-Adresse',
+    badEmail: 'Bitte gültige E-Mail-Adresse eingeben.',
+    sendFailed: 'Senden fehlgeschlagen: ', codeInvalid: 'Code ungültig oder abgelaufen.',
+    notAllowed: 'Angemeldet als {email}, aber diese Adresse ist nicht freigeschaltet. Hinterlegt sind: {list}',
+    noUserList: 'Keine Nutzerliste erhalten — vermutlich fehlen die Zugriffsregeln in dieser Datenbank. Angemeldet als {email}.',
+    accessErr: 'Zugriffsfehler: {msg} (angemeldet als {email})',
+    logout: 'Abmelden', adminView: 'Admin-Sicht',
+    introSummary: 'Worum geht es hier? Kurz erklärt',
+    introP1: 'Wir fragen unsere Kunden regelmäßig, wie zufrieden sie mit der Zusammenarbeit sind. Damit die Befragung bei den richtigen Personen ankommt, brauchen wir von dir die Ansprechpartner auf Kundenseite – für jedes deiner laufenden Projekte.',
+    introS1: '<b>Ausgesetzte Projekte prüfen.</b> Manche Projekte sollen gerade keine Befragung bekommen, etwa weil sie ruhen oder es beim Kunden ungünstig steht. Schau kurz, ob das noch stimmt. Nimmst du eines wieder auf, brauchst du dort anschließend Kontakte.',
+    introS2: '<b>Kontakte ergänzen.</b> Bei Projekten ohne Ansprechpartner trägst du ein, wer auf Kundenseite mitarbeitet. Kontakte aus der letzten Runde sind schon da – meistens musst du nur prüfen. Einzelne Personen kannst du von der Befragung ausnehmen.',
+    introS3: '<b>Bestätigen.</b> Damit gibst du die Kontakte eines Projekts für den Versand frei – oder setzt das Projekt für diese Runde aus. Fertig bist du, wenn nichts mehr offen ist.',
+    introP2: 'Änderst du später noch etwas, wird die Freigabe automatisch zurückgenommen und du bestätigst das Projekt erneut. Sobald die Runde abgeschlossen ist, gehen die Befragungen raus und die Daten sind gesperrt.',
+    roundActive: 'Aktive Runde: <b>{label}</b>', roundNone: 'Keine aktive Runde.',
+    closeRound: 'Runde abschließen', newRound: 'Neue Runde starten',
+    covDone: '<b>{done}</b> von <b>{total}</b> Projekten bestätigt oder ausgesetzt',
+    covOpen: '<b>{n}</b> offen',
+    step1: 'Ausgesetzte prüfen', step2: 'Kontakte ergänzen', step3: 'Bestätigen &amp; freigeben',
+    tabProgress: 'Fortschritt je PL',
+    introProgress: 'Wer ist wie weit? Klick auf eine Zeile, um nur die Projekte dieser Person zu sehen. „Offen" heißt: noch nicht bestätigt oder ausgesetzt.',
+    thPL: 'Projektleitung', thTotal: 'Projekte', thConfirmed: 'bestätigt', thSkipped: 'ausgesetzt',
+    thOpen: 'offen', thNoContacts: 'ohne Kontakte', thDone: 'fertig',
+    sortBy: 'Sortierung: ', sortNr: 'Projektnummer', sortCustomer: 'Kunde', sortPL: 'Projektleitung',
+    sortStatus: 'Status (offen zuerst)', sortContacts: 'Kontakte (wenigste zuerst)',
+    noPLShort: 'ohne Projektleitung', emptyProgress: 'Keine Projekte in dieser Runde.',
+    tabAll: 'Alle Projekte', tabUnowned: 'Ohne Projektleitung', tabExcluded: 'Ausgeschlossen',
+    intro1: 'Diese Projekte bekommen gerade keine Befragung – der Grund steht jeweils dabei. Bestätige mit „Bleibt ausgesetzt\u201c, dass das weiterhin gilt. Soll ein Projekt wieder befragt werden, nimm es auf; es wandert dann in Schritt 2, weil es Kontakte braucht.',
+    intro2: 'Hier fehlen noch die Ansprechpartner: Wer arbeitet auf Kundenseite an diesem Projekt mit? Alle eingetragenen Personen bekommen später die Befragung. Gibt es dieselben Kontakte schon bei einem anderen Projekt desselben Kunden, kannst du sie mit einem Klick übernehmen.',
+    intro3: 'Mit dem Bestätigen gibst du die Kontakte des Projekts für den Versand frei. Änderst du danach noch etwas, wird die Freigabe zurückgenommen und du bestätigst erneut. Fertig bist du, wenn hier nichts mehr offen ist.',
+    intro3none: 'Es läuft gerade keine Runde. Sobald eine gestartet wird, bestätigst du hier deine Projekte.',
+    introAll: 'Alle deine Projekte. Änderungen an einem bereits bestätigten Projekt nehmen die Freigabe zurück – du musst es dann in Schritt 3 erneut bestätigen.',
+    introUnowned: 'Diese Projekte haben keine Projektleitung. Über die Häkchen kannst du sie einer Person zuweisen.',
+    introExcluded: 'Dauerhaft von der Befragung ausgeschlossen, z. B. reine Abrechnungsprojekte ohne Kundenkontakt. Sie tauchen bei keinem PL und in keiner Runde auf.',
+    empty1: 'Keine ausgesetzten Projekte – weiter zu Schritt 2.',
+    empty2: 'Alle Projekte haben Kontakte – weiter zu Schritt 3. 🍐',
+    empty3: 'Dir sind aktuell keine Projekte zugeordnet.',
+    emptyAll: 'Dir sind aktuell keine Projekte zugeordnet.',
+    emptyUnowned: 'Alle Projekte haben eine Projektleitung.',
+    emptyExcluded: 'Keine dauerhaft ausgeschlossenen Projekte.',
+    noHits: 'Keine Treffer.',
+    searchPh: 'Suchen … z.B.  kunde:siemens  projekt:support  nr:2026  pl:koch',
+    allPLs: 'Alle Projektleitungen', noPL: '⚠ Ohne Projektleitung',
+    selectAll: 'Alle sichtbaren auswählen', choosePL: 'Projektleitung wählen …',
+    assign: 'Zuweisen', exclude: 'Ausschließen', confirmAllReady: 'Alle mit Kontakten bestätigen',
+    lockedBanner: '<b>Die Runde ist abgeschlossen.</b> Die Kontaktdaten wurden für den Versand übernommen und sind gesperrt. Wenn sich noch etwas ändern muss, melde dich bitte bei Olivia — sie kann es nachtragen.',
+    allDone: 'Alles erledigt – alle deine Projekte sind für „{label}" bestätigt oder ausgesetzt. Danke!',
+    noRoundHint: 'Keine aktive Runde.', startRoundHint: ' Starte oben rechts eine neue Runde.',
+    contacts: 'Kontakt', contactsPl: 'Kontakte', paused: 'pausiert',
+    tagExcludedC: 'ausgeschlossen', tagConfirmed: 'bestätigt', tagAutoPl: 'PL automatisch — bitte prüfen', tagOrphan: 'PL ausgeschieden', tagSkipped: 'ausgesetzt', tagOpen: 'offen',
+    pausedLine: 'Ausgesetzt: {reason}', excludedLine: 'Dauerhaft ausgeschlossen: {reason}',
+    noContactsYet: 'Noch keine Kontakte hinterlegt.',
+    copyFrom: 'Kontakte aus anderem Projekt übernehmen …',
+    copyTake: 'Ausgewählte übernehmen', copyAvail: '{n} Kontakt(e) verfügbar',
+    firstName: 'Vorname', lastName: 'Nachname', emailHint: 'E-Mail (bekannte werden vorgeschlagen)',
+    addContact: 'Kontakt hinzufügen', claim: 'Mir zuordnen',
+    resume: 'Befragung fortsetzen', pause: 'Projekt von Befragung ausnehmen',
+    keepPaused: 'Bleibt ausgesetzt', keepPausedReason: 'weiterhin ausgesetzt (vom PL bestätigt)',
+    tKeptPaused: 'Bestätigt – Projekt bleibt in dieser Runde ausgesetzt.',
+    confirmProject: 'Für diese Runde bestätigen', skipProject: 'Diese Runde aussetzen',
+    reopen: 'Erneut öffnen', transferTo: 'Übergeben an …', transfer: 'Übergeben',
+    assignTo: 'Zuweisen an …', assignBtn: 'Zuweisen',
+    excludePerm: 'Dauerhaft ausschließen', unexclude: 'Wieder in die Befragung aufnehmen',
+    reinclude: 'Wieder aufnehmen', excludeContact: 'Ausschließen',
+    askExclContact: 'Warum soll diese Person keine Befragung erhalten?\n(z. B. ausgeschieden, Elternzeit, taktisch)',
+    askPause: 'Warum soll dieses Projekt komplett von der Befragung ausgenommen werden?',
+    askExclProject: 'Warum soll dieses Projekt dauerhaft aus der Befragung fallen?\n(z. B. reines Abrechnungsprojekt, kein Kundenkontakt)',
+    askExclBulk: '{n} Projekt(e) dauerhaft ausschließen. Grund:',
+    askSkip: 'Warum wird dieses Projekt in dieser Runde ausgesetzt?',
+    askRoundName: 'Name der neuen Runde (z. B. „2026-Q3"):',
+    confirmNewRound: 'Die laufende Runde „{old}" wird geschlossen und alle Bestätigungen zurückgesetzt. Neue Runde „{new}" starten?',
+    confirmCloseRound: 'Runde „{label}" abschließen? Danach können die PLs nichts mehr ändern.',
+    warnUnconfirmed: 'Achtung: {n} Projekt(e) sind noch nicht bestätigt. Diese Kontakte gehen NICHT in den Versand.\n\n',
+    confirmAssign: '{n} Projekt(e) an {name} zuweisen?',
+    confirmBulkConfirm: '{n} Projekte mit Kontakten bestätigen?',
+    confirmNoContacts: 'Dieses Projekt hat keine aktiven Kontakte – trotzdem bestätigen? Es würde in dieser Runde niemand befragt.',
+    tAdded: '{name} hinzugefügt.', tAddedReconfirm: '{name} hinzugefügt – bitte das Projekt in Schritt 3 erneut bestätigen.',
+    tNeedFields: 'Vorname, Nachname und gültige E-Mail-Adresse angeben.',
+    tAlreadyLinked: 'Kontakt ist diesem Projekt bereits zugeordnet.',
+    tContactExcluded: 'Kontakt ausgeschlossen.', tContactBack: 'Kontakt wieder aufgenommen.',
+    tPaused: 'Projekt von der Befragung ausgenommen.', tResumed: 'Befragung fortgesetzt – bitte Kontakte prüfen und bestätigen.',
+    tClaimed: 'Projekt übernommen.', tTransferred: 'Projekt an {name} übergeben.',
+    tConfirmed: 'Projekt bestätigt.', tSkipped: 'Projekt für diese Runde ausgesetzt.',
+    tReopened: 'Projekt wieder geöffnet.', tBulkConfirmed: '{n} Projekte bestätigt.',
+    tNothingToConfirm: 'Nichts zu bestätigen – offene Projekte haben keine Kontakte oder sind ausgesetzt.',
+    tRoundStarted: 'Runde „{label}" gestartet – alle Projekte sind wieder offen.',
+    tRoundClosed: 'Runde abgeschlossen – Daten sind gesperrt.',
+    tChoosePerson: 'Bitte Person auswählen.', tNoneSelected: 'Keine Projekte ausgewählt – Häkchen an den Karten setzen.',
+    tNoContactsSel: 'Keine Kontakte ausgewählt.', tCopied: '{n} Kontakt(e) übernommen.',
+    tAssigned: '{n} Projekt(e) an {name} zugewiesen.',
+    tExcluded: 'Projekt dauerhaft ausgeschlossen.', tUnexcluded: 'Projekt wieder in der Befragung.',
+    tBulkExcluded: '{n} Projekt(e) ausgeschlossen.',
+    errContact: 'Kontakt konnte nicht gespeichert werden: ', errLink: 'Zuordnung fehlgeschlagen: ',
+    errCopy: 'Übernahme fehlgeschlagen: ',
+  },
+  en: {
+    title: 'bdg · Project Health – Contacts',
+    loginIntro: 'Manage the contacts for our customer satisfaction survey. Sign in with your bdg email address.',
+    emailPh: 'firstname@bdg.io', sendCode: 'Send sign-in code',
+    codeSent: 'We have sent you a sign-in code.',
+    codePh: 'Code from the email', signIn: 'Sign in', otherEmail: 'Use a different email',
+    badEmail: 'Please enter a valid email address.',
+    sendFailed: 'Sending failed: ', codeInvalid: 'Code invalid or expired.',
+    notAllowed: 'Signed in as {email}, but this address is not enabled. Registered addresses: {list}',
+    noUserList: 'No user list received — the access rules are probably missing in this database. Signed in as {email}.',
+    accessErr: 'Access error: {msg} (signed in as {email})',
+    logout: 'Sign out', adminView: 'Admin view',
+    introSummary: 'What is this about? In brief',
+    introP1: 'We regularly ask our customers how satisfied they are with our work. To make sure the survey reaches the right people, we need the customer-side contacts for each of your running projects.',
+    introS1: '<b>Review paused projects.</b> Some projects should not receive a survey right now, for example because they are on hold or the timing is difficult. Check whether that still applies. If you resume one, it will then need contacts.',
+    introS2: '<b>Add contacts.</b> For projects without contacts, enter who is involved on the customer side. Contacts from the last round are already there – usually you just need to review them. You can exclude individual people from the survey.',
+    introS3: '<b>Confirm.</b> This releases a project\'s contacts for sending – or skips the project for this round. You are done once nothing is left open.',
+    introP2: 'If you change something afterwards, the release is withdrawn automatically and you confirm the project again. Once the round is closed, the surveys go out and the data is locked.',
+    roundActive: 'Active round: <b>{label}</b>', roundNone: 'No active round.',
+    closeRound: 'Close round', newRound: 'Start new round',
+    covDone: '<b>{done}</b> of <b>{total}</b> projects confirmed or skipped',
+    covOpen: '<b>{n}</b> open',
+    step1: 'Review paused', step2: 'Add contacts', step3: 'Confirm &amp; release',
+    tabProgress: 'Progress by lead',
+    introProgress: 'Who has done what? Click a row to show only that person\'s projects. „Open" means: not yet confirmed or skipped.',
+    thPL: 'Project lead', thTotal: 'Projects', thConfirmed: 'confirmed', thSkipped: 'skipped',
+    thOpen: 'open', thNoContacts: 'without contacts', thDone: 'done',
+    sortBy: 'Sort: ', sortNr: 'Project number', sortCustomer: 'Customer', sortPL: 'Project lead',
+    sortStatus: 'Status (open first)', sortContacts: 'Contacts (fewest first)',
+    noPLShort: 'without project lead', emptyProgress: 'No projects in this round.',
+    tabAll: 'All projects', tabUnowned: 'Without project lead', tabExcluded: 'Excluded',
+    intro1: 'These projects are not receiving a survey at the moment – the reason is shown with each. Confirm with „Keep paused\u201c that this still applies. If a project should be surveyed again, resume it; it then moves to step 2 because it needs contacts.',
+    intro2: 'Contacts are still missing here: who is working on this project on the customer side? Everyone listed will receive the survey. If the same contacts already exist on another project for the same customer, you can copy them in one click.',
+    intro3: 'Confirming releases the project\'s contacts for sending. If you change anything afterwards, the release is withdrawn and you confirm again. You are done once nothing is left open here.',
+    intro3none: 'No round is currently running. Once one is started, you confirm your projects here.',
+    introAll: 'All of your projects. Changing an already confirmed project withdraws its release – you then need to confirm it again in step 3.',
+    introUnowned: 'These projects have no project lead. Use the checkboxes to assign them to someone.',
+    introExcluded: 'Permanently excluded from the survey, e.g. pure billing projects without customer contact. They do not appear for any project lead or in any round.',
+    empty1: 'No paused projects – on to step 2.',
+    empty2: 'All projects have contacts – on to step 3. 🍐',
+    empty3: 'No projects are assigned to you at the moment.',
+    emptyAll: 'No projects are assigned to you at the moment.',
+    emptyUnowned: 'All projects have a project lead.',
+    emptyExcluded: 'No permanently excluded projects.',
+    noHits: 'No matches.',
+    searchPh: 'Search … e.g.  kunde:siemens  projekt:support  nr:2026  pl:koch',
+    allPLs: 'All project leads', noPL: '⚠ Without project lead',
+    selectAll: 'Select all visible', choosePL: 'Choose project lead …',
+    assign: 'Assign', exclude: 'Exclude', confirmAllReady: 'Confirm all with contacts',
+    lockedBanner: '<b>This round is closed.</b> The contact data has been taken over for sending and is locked. If something still needs to change, please contact Olivia — she can update it.',
+    allDone: 'All done – all your projects are confirmed or skipped for „{label}". Thank you!',
+    noRoundHint: 'No active round.', startRoundHint: ' Start a new round in the top right.',
+    contacts: 'contact', contactsPl: 'contacts', paused: 'paused',
+    tagExcludedC: 'excluded', tagConfirmed: 'confirmed', tagAutoPl: 'PL auto-assigned — please check', tagOrphan: 'PL has left', tagSkipped: 'skipped', tagOpen: 'open',
+    pausedLine: 'Paused: {reason}', excludedLine: 'Permanently excluded: {reason}',
+    noContactsYet: 'No contacts added yet.',
+    copyFrom: 'Copy contacts from another project …',
+    copyTake: 'Copy selected', copyAvail: '{n} contact(s) available',
+    firstName: 'First name', lastName: 'Last name', emailHint: 'Email (known ones are suggested)',
+    addContact: 'Add contact', claim: 'Assign to me',
+    resume: 'Resume survey', pause: 'Exclude project from this survey',
+    keepPaused: 'Keep paused', keepPausedReason: 'still paused (confirmed by lead)',
+    tKeptPaused: 'Confirmed – project stays paused for this round.',
+    confirmProject: 'Confirm for this round', skipProject: 'Skip this round',
+    reopen: 'Reopen', transferTo: 'Hand over to …', transfer: 'Hand over',
+    assignTo: 'Assign to …', assignBtn: 'Assign',
+    excludePerm: 'Exclude permanently', unexclude: 'Include in survey again',
+    reinclude: 'Include again', excludeContact: 'Exclude',
+    askExclContact: 'Why should this person not receive the survey?\n(e.g. left the company, parental leave, tactical)',
+    askPause: 'Why should this project be excluded from the survey entirely?',
+    askExclProject: 'Why should this project be permanently removed from the survey?\n(e.g. billing-only project, no customer contact)',
+    askExclBulk: 'Permanently exclude {n} project(s). Reason:',
+    askSkip: 'Why is this project being skipped this round?',
+    askRoundName: 'Name of the new round (e.g. „2026-Q3"):',
+    confirmNewRound: 'The running round „{old}" will be closed and all confirmations reset. Start new round „{new}"?',
+    confirmCloseRound: 'Close round „{label}"? After that, project leads can no longer make changes.',
+    warnUnconfirmed: 'Warning: {n} project(s) are not confirmed yet. Those contacts will NOT be included.\n\n',
+    confirmAssign: 'Assign {n} project(s) to {name}?',
+    confirmBulkConfirm: 'Confirm {n} projects that have contacts?',
+    confirmNoContacts: 'This project has no active contacts – confirm anyway? Nobody would be surveyed this round.',
+    tAdded: '{name} added.', tAddedReconfirm: '{name} added – please confirm the project again in step 3.',
+    tNeedFields: 'Please enter first name, last name and a valid email address.',
+    tAlreadyLinked: 'This contact is already linked to the project.',
+    tContactExcluded: 'Contact excluded.', tContactBack: 'Contact included again.',
+    tPaused: 'Project excluded from the survey.', tResumed: 'Survey resumed – please check contacts and confirm.',
+    tClaimed: 'Project assigned to you.', tTransferred: 'Project handed over to {name}.',
+    tConfirmed: 'Project confirmed.', tSkipped: 'Project skipped for this round.',
+    tReopened: 'Project reopened.', tBulkConfirmed: '{n} projects confirmed.',
+    tNothingToConfirm: 'Nothing to confirm – open projects have no contacts or are paused.',
+    tRoundStarted: 'Round „{label}" started – all projects are open again.',
+    tRoundClosed: 'Round closed – data is locked.',
+    tChoosePerson: 'Please choose a person.', tNoneSelected: 'No projects selected – tick the boxes on the cards.',
+    tNoContactsSel: 'No contacts selected.', tCopied: '{n} contact(s) copied.',
+    tAssigned: '{n} project(s) assigned to {name}.',
+    tExcluded: 'Project permanently excluded.', tUnexcluded: 'Project included in the survey again.',
+    tBulkExcluded: '{n} project(s) excluded.',
+    errContact: 'Could not save contact: ', errLink: 'Linking failed: ',
+    errCopy: 'Copying failed: ',
+  }
+};
+let LANG = (() => {
+  try { const s = localStorage.getItem('ph_lang'); if (s) return s; } catch (e) {}
+  return (navigator.language || 'de').toLowerCase().startsWith('de') ? 'de' : 'en';
+})();
+function t(key, vars) {
+  let s = (TEXTS[LANG] && TEXTS[LANG][key]) ?? TEXTS.de[key] ?? key;
+  if (vars) for (const k in vars) s = s.split('{' + k + '}').join(vars[k]);
+  return s;
+}
+function setLang(l) {
+  LANG = l;
+  try { localStorage.setItem('ph_lang', l); } catch (e) {}
+  applyStaticTexts();
+  if (me) render();
+}
+
+const db = supabase.createClient(SUPABASE_URL, ANON_KEY);
+let me = null, users = [], projects = [], links = [], allContacts = [];
+let wave = null, waveRows = [];   // aktive Runde + wave_projects
+let step = 's1';
+let sortBy = 'nr';
+let progSort = 'open';
+const openIds = new Set();
+const justEdited = new Set();   // in dieser Sitzung bearbeitet -> bleiben in Schritt 2 sichtbar
+const selIds = new Set();
+let visibleIds = [];
+const $ = id => document.getElementById(id);
+
+/* ---------------- Auth ---------------- */
+async function sendCode() {
+  const email = $('email').value.trim().toLowerCase();
+  if (!email.includes('@')) return msg(t('badEmail'));
+  $('btn-send').disabled = true;
+  const { error } = await db.auth.signInWithOtp({ email });
+  $('btn-send').disabled = false;
+  if (error) return msg(t('sendFailed') + (error.message || '?'));
+  $('step-email').style.display = 'none'; $('step-code').style.display = ''; msg('');
+}
+async function verifyCode() {
+  const email = $('email').value.trim().toLowerCase();
+  const token = $('code').value.trim();
+  const { error } = await db.auth.verifyOtp({ email, token, type: 'email' });
+  if (error) return msg(t('codeInvalid'));
+  applyStaticTexts();
+  await boot();
+}
+function backToEmail() { $('step-code').style.display='none'; $('step-email').style.display=''; }
+function msg(t) { $('login-msg').textContent = t; }
+async function logout() { await db.auth.signOut(); location.reload(); }
+
+/* ---------------- Laden ---------------- */
+async function boot() {
+  const { data: { session } } = await db.auth.getSession();
+  if (!session) return;
+  const email = session.user.email.toLowerCase();
+  // Hinweis: kein .eq('email', …) — ein "+" in der Adresse (z. B. of+pl@bdg.io)
+  // wird im URL-Filter als Leerzeichen interpretiert. Deshalb clientseitig suchen;
+  // die Zeilen liefert RLS ohnehin nur an freigeschaltete Nutzer.
+  const { data: allUsers, error: uErr } = await db.from('users').select('*');
+  const meRows = (allUsers || []).filter(u => (u.email || '').toLowerCase() === email);
+  if (!meRows.length) {
+    if (uErr) {
+      msg(t('accessErr', {msg: uErr.message, email}));
+    } else if (!allUsers || !allUsers.length) {
+      msg(t('noUserList', {email}));
+    } else {
+      msg(t('notAllowed', {email, list: allUsers.map(u => u.email).slice(0,5).join(', ') + (allUsers.length > 5 ? ' …' : '')}));
+    }
+    await db.auth.signOut(); return;
+  }
+  me = meRows[0];
+  $('login').style.display = 'none'; $('app').style.display = 'block';
+  applyStaticTexts();
+  try {
+    const seen = localStorage.getItem('ph_intro_seen');
+    $('intro').open = !seen;
+    $('intro').addEventListener('toggle', () => {
+      try { localStorage.setItem('ph_intro_seen', '1'); } catch (e) {}
+    });
+  } catch (e) { $('intro').open = true; }
+  await reload();
+}
+const isAdmin = () => ['admin','delivery_lead'].includes(me.role);
+const roundOpen = () => !!wave;                 // Runde im Status pl_review vorhanden
+const canEdit  = () => isAdmin() || roundOpen(); // PLs nur waehrend laufender Runde
+
+async function reload() {
+  const [p, l, u, c, w] = await Promise.all([
+    db.from('projects')
+      .select('id, project_number, project_name, customer_name, customer_number, category, survey_paused, survey_paused_reason, survey_excluded, survey_excluded_reason, pl_auto_assigned, pl_user_id, pl:users!projects_pl_user_id_fkey(name)')
+      .eq('status','active').eq('survey_mode','recurring').order('project_number'),
+    db.from('project_contacts')
+      .select('id, project_id, status, excluded_reason, contact:contacts(id, first_name, last_name, email)'),
+    db.from('users').select('id, name, email').eq('active', true).order('name'),
+    db.from('contacts').select('id, first_name, last_name, email').order('last_name').limit(2000),
+    db.from('waves').select('id, label, status').eq('status','pl_review').order('created_at', { ascending: false }).limit(1),
+  ]);
+  projects = p.data || []; links = l.data || []; users = u.data || []; allContacts = c.data || [];
+  wave = (w.data && w.data[0]) || null;
+  waveRows = [];
+  if (wave) {
+    const { data } = await db.from('wave_projects')
+      .select('id, project_id, review_status, skipped_reason').eq('wave_id', wave.id);
+    waveRows = data || [];
+  }
+  $('contact-suggest').innerHTML = allContacts
+    .map(k => `<option value="${esc(k.email)}">${esc(k.first_name)} ${esc(k.last_name)}</option>`).join('');
+  render();
+}
+const linksOf = pid => links.filter(l => l.project_id === pid);
+const activeLinks = pid => linksOf(pid).filter(l => l.status === 'active');
+const wpOf = pid => waveRows.find(w => w.project_id === pid);
+const mine = () => projects.filter(p => (isAdmin() || p.pl_user_id === me.id) && !p.survey_excluded);
+
+/* ---------------- Navigation ----------------
+   Tab- und Filterwechsel laufen ueber diese beiden Funktionen, damit die
+   Mehrfachauswahl nicht in einen Bereich mitwandert, in dem die ausgewaehlten
+   Projekte gar nicht mehr sichtbar sind. Die Suche raeumt bewusst NICHT auf:
+   erst filtern, dann "alle sichtbaren auswaehlen" ist ein gewollter Ablauf. */
+function setStep(id) {
+  if (step !== id) selIds.clear();
+  step = id;
+  render();
+}
+function onPlFilterChange() {
+  selIds.clear();
+  render();
+}
+
+/* ---------------- Rendering ---------------- */
+// Ein Projekt gilt als verwaist, wenn eine Projektleitung eingetragen ist,
+// die es nicht mehr gibt. reload() laedt nur aktive Nutzer, ausgeschiedene
+// fehlen also in `users`. Ohne diese Pruefung faellt so ein Projekt durchs
+// Raster: beim PL taucht es nicht auf (die Person meldet sich nie wieder an)
+// und unter "Ohne Projektleitung" auch nicht, weil das Feld gefuellt ist.
+function isOrphan(p) {
+  return !!p.pl_user_id && !users.some(u => u.id === p.pl_user_id);
+}
+function buckets() {
+  const m = mine();
+  return {
+    s1: m.filter(p => p.survey_paused && (!wave || !wpOf(p.id) || wpOf(p.id).review_status === 'pending')),
+    s2: m.filter(p => !p.survey_paused && (activeLinks(p.id).length === 0 || justEdited.has(p.id))),
+    all: m,
+    s3: m.filter(p => wpOf(p.id) && !p.survey_paused),
+    unowned: isAdmin() ? projects.filter(p => (!p.pl_user_id || isOrphan(p)) && !p.survey_excluded) : [],
+    excluded: isAdmin() ? projects.filter(p => p.survey_excluded) : [],
+  };
+}
+function render() {
+  const b = buckets();
+
+  // Runden-Kopf & Fortschritt
+  setHtml('round-label', wave
+    ? t('roundActive', {label: esc(wave.label)})
+    : t('roundNone'));
+  setDisp('btn-round', isAdmin() ? '' : 'none');
+  setDisp('btn-close', (isAdmin() && wave) ? '' : 'none');
+  setTxt('btn-round', t('newRound'));
+  setTxt('btn-close', t('closeRound'));
+  if (wave && b.s3.length) {
+    const done = b.s3.filter(p => wpOf(p.id).review_status !== 'pending').length;
+    setDisp('coverage', '');
+    setHtml('cov-l', t('covDone', {done, total: b.s3.length}));
+    setHtml('cov-r', t('covOpen', {n: b.s3.length - done}));
+    { const e = $('cov-bar'); if (e) e.style.width = (100 * done / b.s3.length) + '%'; }
+  } else setDisp('coverage', 'none');
+
+  // Schritte
+  const pending3 = wave ? b.s3.filter(p => wpOf(p.id).review_status === 'pending').length : 0;
+  const stepsDef = [
+    ['s1', '1', t('step1'), b.s1.length, b.s1.length === 0],
+    ['s2', '2', t('step2'), b.s2.length, b.s2.length === 0],
+    ['s3', '3', t('step3'), pending3, wave && pending3 === 0 && b.s3.length > 0],
+  ];
+  setHtml('steps', stepsDef.map(([id, no, label, n, done]) =>
+    `<button class="${step===id?'active':''} ${done?'done':''}" onclick="setStep('${id}')">
+       <span class="stepno">${done?'✓':no}</span>${label}<span class="count">${n}</span></button>`).join('')
+    + `<span class="spacer"></span>
+       <button class="${step==='all'?'active':''}" onclick="setStep('all')">${t('tabAll')}<span class="count">${b.all.length}</span></button>
+       ${isAdmin() ? `
+       <button class="${step==='progress'?'active':''}" onclick="setStep('progress')">${t('tabProgress')}</button>
+       <button class="${step==='unowned'?'active':''}" onclick="setStep('unowned')">${t('tabUnowned')}<span class="count">${b.unowned.length}</span></button>
+       <button class="${step==='excluded'?'active':''}" onclick="setStep('excluded')">${t('tabExcluded')}<span class="count">${b.excluded.length}</span></button>` : ''}`);
+
+  setTxt('stepintro', {
+    s1: t('intro1'), s2: t('intro2'),
+    s3: wave ? t('intro3') : t('intro3none'),
+    all: t('introAll'), unowned: t('introUnowned'), excluded: t('introExcluded'), progress: t('introProgress'),
+  }[step]);
+
+  // Abschluss-Banner
+  // Hinweis: fuer einen PL ohne laufende Runde koennen wir clientseitig nicht
+  // unterscheiden, ob eine Runde abgeschlossen wurde oder noch nie eine lief —
+  // reload() laedt nur waves mit status='pl_review'. Bis dahin gilt derselbe Text.
+  if (!canEdit()) {
+    setHtml('round-banner', `<div class="banner">${t('lockedBanner')}</div>`);
+  } else if (wave && step === 's3' && b.s3.length > 0 && pending3 === 0) {
+    setHtml('round-banner', `<div class="banner ok">${t('allDone', {label: esc(wave.label)})}</div>`);
+  } else if (!wave && step === 's3') {
+    setHtml('round-banner',
+      `<div class="banner"><span class="hint">${t('noRoundHint')}</span>${isAdmin() ? t('startRoundHint') : ''}</div>`);
+  } else {
+    setHtml('round-banner', '');
+  }
+
+  setTxt('btn-bulk', t('confirmAllReady'));
+  setDisp('btn-bulk', (wave && step === 's3') ? '' : 'none');
+
+  // Liste
+  const q = $('search').value.trim().toLowerCase();
+  let list = b[step] || [];
+  const openRank = p => { const w = wpOf(p.id); return w && w.review_status === 'pending' ? 0 : 1; };
+  const cmpNr = (a, b2) => a.project_number.localeCompare(b2.project_number);
+  const cmp = {
+    nr:       cmpNr,
+    customer: (a, b2) => (a.customer_name || '~').localeCompare(b2.customer_name || '~') || cmpNr(a, b2),
+    pl:       (a, b2) => (a.pl?.name || '~~').localeCompare(b2.pl?.name || '~~') || cmpNr(a, b2),
+    status:   (a, b2) => openRank(a) - openRank(b2) || cmpNr(a, b2),
+    contacts: (a, b2) => activeLinks(a.id).length - activeLinks(b2.id).length || cmpNr(a, b2),
+  }[sortBy] || cmpNr;
+  list = [...list].sort(cmp);
+  // Admin-Massenzuweisung
+  const ba = $('bulk-admin');
+  if (isAdmin()) {
+    ba.style.display = 'inline-flex';
+    $('bulk-pl').innerHTML = `<option value="">${t('choosePL')}</option>` +
+      users.map(u => `<option value="${u.id}">${esc(u.name)}</option>`).join('');
+    setTxt('bulk-selall', t('selectAll'));
+    setTxt('bulk-assign', selIds.size ? `${t('assign')} (${selIds.size})` : t('assign'));
+    setTxt('bulk-exclude', selIds.size ? `${t('exclude')} (${selIds.size})` : t('exclude'));
+    setDisp('bulk-exclude', step === 'excluded' ? 'none' : '');
+  } else { ba.style.display = 'none'; }
+
+  // Sortier-Auswahl
+  setTxt('sort-label', t('sortBy'));
+  {
+    const s = $('sort-by');
+    if (s) {
+      const opts = [['nr', t('sortNr')], ['customer', t('sortCustomer')],
+                    ...(isAdmin() ? [['pl', t('sortPL')]] : []),
+                    ['status', t('sortStatus')], ['contacts', t('sortContacts')]];
+      if (s.dataset.lang !== LANG || s.options.length !== opts.length) {
+        s.innerHTML = opts.map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
+        s.dataset.lang = LANG;
+      }
+      if ([...s.options].some(o => o.value === sortBy)) s.value = sortBy;
+      else { sortBy = 'nr'; s.value = 'nr'; }
+      s.style.display = step === 'progress' ? 'none' : '';
+      const lab = $('sort-label'); if (lab) lab.style.display = step === 'progress' ? 'none' : '';
+    }
+  }
+
+  // Admin: PL-Filter befüllen (Auswahl bleibt erhalten)
+  const plSel = $('pl-filter');
+  if (isAdmin()) {
+    const cur = plSel.value;
+    const plIds = new Set(projects.map(p => p.pl_user_id).filter(Boolean));
+    plSel.innerHTML = `<option value="">${t('allPLs')}</option><option value="none">${t('noPL')}</option>` +
+      users.filter(u => plIds.has(u.id))
+           .map(u => `<option value="${u.id}">${esc(u.name)}</option>`).join('');
+    plSel.value = cur;
+    plSel.style.display = '';
+  } else plSel.style.display = 'none';
+  const plf = isAdmin() ? plSel.value : '';
+  if (plf) list = list.filter(p => plf === 'none' ? !p.pl_user_id : p.pl_user_id === plf);
+
+  // visibleIds IMMER setzen, auch beim Fortschritts-Tab. Dort sind keine
+  // Projektkarten sichtbar, also ist die richtige Antwort eine leere Liste —
+  // vorher blieb der Stand des vorherigen Tabs stehen und die Massenaktionen
+  // liefen auf Projekten, die gar nicht auf dem Schirm waren.
+  list = list.filter(p => matchQuery(q, p));
+  visibleIds = step === 'progress' ? [] : list.map(p => p.id);
+  if (step === 'progress') { renderProgress(); return; }
+  setHtml('list', list.length ? list.map(card).join('') :
+    `<div class="empty">${q ? t('noHits') : emptyText()}</div>`);
+}
+function emptyText() {
+  return { s1: t('empty1'), s2: t('empty2'), s3: t('empty3'),
+           all: t('emptyAll'), unowned: t('emptyUnowned'), excluded: t('emptyExcluded') }[step];
+}
+function card(p) {
+  const ls = linksOf(p.id);
+  const nAct = ls.filter(l => l.status === 'active').length;
+  const open = openIds.has(p.id);
+  const wp = wpOf(p.id);
+  const plInfo = (isAdmin() || step === 'unowned') && p.pl ? ` · PL: ${esc(p.pl.name)}` : '';
+  // Zwei Hinweise, die den PL zum Pruefen bewegen sollen, ohne dass jemand
+  // zentral nachhalten muss: alphabetisch geratene Zuordnung und verwaiste
+  // Projekte (eingetragene Projektleitung ist nicht mehr im Haus).
+  const plTag = isOrphan(p) ? `<span class="tag">${t('tagOrphan')}</span>`
+              : (p.pl_auto_assigned && p.pl_user_id) ? `<span class="tag">${t('tagAutoPl')}</span>`
+              : '';
+  const stateTag = wp
+    ? (wp.review_status === 'confirmed' ? `<span class="tag ok">${t('tagConfirmed')}</span>`
+      : wp.review_status === 'skipped' ? `<span class="tag">${t('tagSkipped')}${wp.skipped_reason?': '+esc(wp.skipped_reason):''}</span>`
+      : (step === 's3' ? `<span class="tag pear">${t('tagOpen')}</span>` : ''))
+    : '';
+  const done2 = (step === 's2' || step === 'all') && nAct > 0;
+  const cls = ['project',
+    (step === 's2' || step === 'all') && nAct === 0 && !p.survey_paused ? 'todo' : '',
+    done2 && justEdited.has(p.id) ? 'confirmed' : '',
+    p.survey_paused ? 'paused' : '',
+    wp && wp.review_status === 'confirmed' ? 'confirmed' : '',
+    wp && wp.review_status === 'skipped' ? 'skipped' : '',
+    open ? 'open' : ''].join(' ');
+  return `
+  <div class="${cls}" id="p-${p.id}">
+    <div class="p-head" onclick="toggle('${p.id}')">
+      ${isAdmin() ? `<input type="checkbox" class="sel" onclick="toggleSel('${p.id}', event)" ${selIds.has(p.id)?'checked':''}>` : ''}
+      <span class="nr">${esc(p.project_number)}</span>
+      <span class="name">${esc(p.project_name||'')}<span class="cust">${esc(p.customer_name||'')}${plInfo}</span></span>
+      ${plTag}${stateTag}
+      <span class="meta"><span class="n">${nAct}</span> ${nAct===1?t('contacts'):t('contactsPl')}${p.survey_paused?' · '+t('paused'):''}</span>
+    </div>
+    <div class="p-body">
+      ${p.survey_paused ? `<p class="hint">${t('pausedLine', {reason: esc(p.survey_paused_reason||'—')})}</p>` : ''}
+      ${p.survey_excluded ? `<p class="hint">${t('excludedLine', {reason: esc(p.survey_excluded_reason||'—')})}</p>` : ''}
+      ${ls.length ? `<table class="contacts">${ls.map(l => rowHtml(l)).join('')}</table>`
+                  : `<p class="hint">${t('noContactsYet')}</p>`}
+      ${canEdit() && !p.survey_excluded && copySourcesFor(p).length ? `
+      <div class="copyrow">
+        <select id="cp-${p.id}" onchange="showCopyContacts('${p.id}')">
+          <option value="">${t('copyFrom')}</option>
+          ${copySourcesFor(p).map(s => `<option value="${s.id}">${s.sameCustomer ? '★ ' : ''}${esc(s.project_number)} · ${esc(s.customer_name || s.project_name || '')} (${s.n})</option>`).join('')}
+        </select>
+        <div id="cplist-${p.id}"></div>
+      </div>` : ''}
+      ${canEdit() && !p.survey_excluded ? `<div class="addrow">
+        <input id="fn-${p.id}" placeholder="${t('firstName')}">
+        <input id="ln-${p.id}" placeholder="${t('lastName')}">
+        <input id="em-${p.id}" type="email" list="contact-suggest" placeholder="${t('emailHint')}" onchange="prefill('${p.id}')">
+        <button onclick="addContact('${p.id}')">${t('addContact')}</button>
+      </div>` : ''}
+      <div class="p-actions">
+        ${!canEdit() ? '' : (p.survey_excluded
+        /* Dauerhaft ausgeschlossen: nur zurueckholen und zuweisen. Bestaetigen,
+           Aussetzen oder Kontakte pflegen ergibt hier keinen Sinn. */
+        ? `${isAdmin() ? `<button class="ghost" onclick="unexclude('${p.id}')">${t('unexclude')}</button>` : ''}`
+        : `
+        ${p.pl_user_id ? '' : `<button onclick="claim('${p.id}')">${t('claim')}</button>`}
+        ${p.survey_paused
+          ? `${(wave && wp && wp.review_status === 'pending')
+               ? `<button onclick="keepPaused('${wp.id}')">${t('keepPaused')}</button>` : ''}
+             <button class="ghost" onclick="resume('${p.id}')">${t('resume')}</button>`
+          : `<button class="quiet" onclick="pause('${p.id}')">${t('pause')}</button>`}
+        ${wave && wp && wp.review_status === 'pending' && !p.survey_paused ? `
+          <button onclick="confirmProject('${wp.id}','${p.id}')">${t('confirmProject')}</button>
+          <button class="quiet" onclick="skipProject('${wp.id}')">${t('skipProject')}</button>` : ''}
+        ${wave && wp && wp.review_status !== 'pending' ? `
+          <button class="quiet" onclick="reopenProject('${wp.id}')">${t('reopen')}</button>` : ''}
+        ${isAdmin() ? `<button class="danger" onclick="excludeProject('${p.id}')">${t('excludePerm')}</button>` : ''}
+        `)}
+        ${!canEdit() ? '' : `
+        <select id="tr-${p.id}">
+            <option value="">${p.pl_user_id ? t('transferTo') : t('assignTo')}</option>
+            ${users.filter(u=>u.id!==p.pl_user_id).map(u=>`<option value="${u.id}">${esc(u.name)}</option>`).join('')}
+          </select>
+          <button class="ghost" onclick="transfer('${p.id}')">${p.pl_user_id ? t('transfer') : t('assignBtn')}</button>
+        `}
+      </div>
+    </div>
+  </div>`;
+}
+function rowHtml(l) {
+  const k = l.contact, ex = l.status === 'excluded';
+  return `<tr>
+    <td>${esc(k.first_name)} ${esc(k.last_name)} ${ex?`<span class="tag ex">${t('tagExcludedC')}</span>`:''}</td>
+    <td class="mail">${esc(k.email)}${ex&&l.excluded_reason?` · ${esc(l.excluded_reason)}`:''}</td>
+    <td class="actions">
+      ${!canEdit() ? '' : (ex
+        ? `<button class="ghost" onclick="setStatus('${l.id}','active')">${t('reinclude')}</button>`
+        : `<button class="danger" onclick="exclude('${l.id}')">${t('excludeContact')}</button>`)}
+    </td>
+  </tr>`;
+}
+function toggle(pid) { openIds.has(pid) ? openIds.delete(pid) : openIds.add(pid); render(); }
+function prefill(pid) {
+  const em = $(`em-${pid}`).value.trim().toLowerCase();
+  const k = allContacts.find(c => c.email.toLowerCase() === em);
+  if (k) { $(`fn-${pid}`).value = k.first_name; $(`ln-${pid}`).value = k.last_name; }
+}
+
+/* ---------------- Aktionen ---------------- */
+async function addContact(pid) {
+  const fn = $(`fn-${pid}`).value.trim(), ln = $(`ln-${pid}`).value.trim(),
+        em = $(`em-${pid}`).value.trim().toLowerCase();
+  if (!fn || !ln || !em.includes('@')) return toast(t('tNeedFields'), true);
+  const { data: c, error: e1 } = await db.from('contacts')
+    .upsert({ first_name: fn, last_name: ln, email: em }, { onConflict: 'email' }).select().single();
+  if (e1) return toast(t('errContact') + e1.message, true);
+  const existing = linksOf(pid).find(l => l.contact.id === c.id);
+  if (existing) {
+    if (existing.status === 'active') return toast(t('tAlreadyLinked'), true);
+    await db.from('project_contacts').update({ status: 'active', excluded_reason: null }).eq('id', existing.id);
+  } else {
+    const { error: e2 } = await db.from('project_contacts')
+      .insert({ project_id: pid, contact_id: c.id, status: 'active', added_by: me.id });
+    if (e2) return toast(t('errLink') + e2.message, true);
+  }
+  const wasConfirmed = wpOf(pid) && wpOf(pid).review_status === 'confirmed';
+  toast(t(wasConfirmed ? 'tAddedReconfirm' : 'tAdded', {name: `${fn} ${ln}`}));
+  openIds.add(pid); justEdited.add(pid); await reload();
+}
+async function exclude(linkId) {
+  const reason = prompt(t('askExclContact'));
+  if (reason === null) return;
+  await db.from('project_contacts').update({ status: 'excluded', excluded_reason: reason || null }).eq('id', linkId);
+  toast(t('tContactExcluded')); await reload();
+}
+async function setStatus(linkId, status) {
+  await db.from('project_contacts').update({ status, excluded_reason: null }).eq('id', linkId);
+  toast(t('tContactBack')); await reload();
+}
+async function pause(pid) {
+  const reason = prompt(t('askPause'));
+  if (reason === null) return;
+  await db.from('projects').update({ survey_paused: true, survey_paused_reason: reason || null }).eq('id', pid);
+  const wp = wpOf(pid);
+  if (wave && wp && wp.review_status === 'pending') {
+    await db.from('wave_projects').update({ review_status: 'skipped', skipped_reason: 'pausiert: ' + (reason || 'ohne Angabe'), confirmed_by: me.id }).eq('id', wp.id);
+  }
+  toast(t('tPaused')); await reload();
+}
+async function resume(pid) {
+  await db.from('projects').update({ survey_paused: false, survey_paused_reason: null }).eq('id', pid);
+  const wp = wpOf(pid);
+  if (wave && wp && wp.review_status === 'skipped') {
+    await db.from('wave_projects').update({ review_status: 'pending', skipped_reason: null }).eq('id', wp.id);
+  }
+  toast(t('tResumed')); await reload();
+}
+async function claim(pid) {
+  const { error } = await db.from('projects').update({ pl_user_id: me.id, pl_auto_assigned: false }).eq('id', pid);
+  error ? toast(error.message, true) : toast(t('tClaimed'));
+  await reload();
+}
+async function transfer(pid) {
+  const to = $(`tr-${pid}`).value;
+  if (!to) return toast(t('tChoosePerson'), true);
+  const u = users.find(x => x.id === to);
+  // via Funktion: ein direktes Update waere blockiert, sobald man das Projekt
+  // durch die Uebergabe selbst nicht mehr sehen darf
+  const { error } = await db.rpc('assign_projects', { p_projects: [pid], p_to: to });
+  error ? toast(error.message, true) : toast(t('tTransferred', {name: u.name}));
+  await reload();
+}
+
+/* --------- Runden-Aktionen --------- */
+async function confirmProject(wpId, pid) {
+  if (activeLinks(pid).length === 0 &&
+      !confirm(t('confirmNoContacts'))) return;
+  const { error } = await db.from('wave_projects')
+    .update({ review_status: 'confirmed', confirmed_by: me.id }).eq('id', wpId);
+  error ? toast(error.message, true) : toast(t('tConfirmed'));
+  await reload();
+}
+async function keepPaused(wpId) {
+  const { error } = await db.from('wave_projects')
+    .update({ review_status: 'skipped', skipped_reason: t('keepPausedReason'), confirmed_by: me.id })
+    .eq('id', wpId);
+  error ? toast(error.message, true) : toast(t('tKeptPaused'));
+  await reload();
+}
+
+async function skipProject(wpId) {
+  const reason = prompt(t('askSkip'));
+  if (reason === null) return;
+  const { error } = await db.from('wave_projects')
+    .update({ review_status: 'skipped', skipped_reason: reason || null, confirmed_by: me.id }).eq('id', wpId);
+  error ? toast(error.message, true) : toast(t('tSkipped'));
+  await reload();
+}
+async function reopenProject(wpId) {
+  await db.from('wave_projects').update({ review_status: 'pending', skipped_reason: null }).eq('id', wpId);
+  toast(t('tReopened')); await reload();
+}
+async function confirmAllReady() {
+  const b = buckets();
+  const targets = b.s3.filter(p => wpOf(p.id).review_status === 'pending'
+                                && !p.survey_paused && activeLinks(p.id).length > 0);
+  if (!targets.length) return toast(t('tNothingToConfirm'), true);
+  if (!confirm(t('confirmBulkConfirm', {n: targets.length}))) return;
+  for (const p of targets) {
+    await db.from('wave_projects').update({ review_status: 'confirmed', confirmed_by: me.id }).eq('id', wpOf(p.id).id);
+  }
+  toast(t('tBulkConfirmed', {n: targets.length})); await reload();
+}
+async function closeRound() {
+  const b = buckets();
+  const offen = wave ? b.s3.filter(p => wpOf(p.id) && wpOf(p.id).review_status === 'pending').length : 0;
+  const warn = offen ? t('warnUnconfirmed', {n: offen}) : '';
+  if (!confirm(warn + t('confirmCloseRound', {label: wave.label}))) return;
+  const { error } = await db.rpc('close_round');
+  error ? toast(error.message, true) : toast(t('tRoundClosed'));
+  await reload();
+}
+
+async function startRound() {
+  const label = prompt(t('askRoundName'), new Date().getFullYear() + '-Q' + (Math.floor(new Date().getMonth()/3)+1));
+  if (!label) return;
+  if (wave && !confirm(t('confirmNewRound', {old: wave.label, new: label}))) return;
+  const { error } = await db.rpc('start_new_round', { p_label: label });
+  error ? toast(error.message, true) : toast(t('tRoundStarted', {label}));
+  step = 's1'; selIds.clear(); justEdited.clear(); await reload();
+}
+
+/* --------- Admin: Fortschritt je Projektleitung --------- */
+function renderProgress() {
+  const rows = new Map();
+  for (const p of projects) {
+    if (p.survey_excluded) continue;
+    const key = p.pl_user_id || 'none';
+    if (!rows.has(key)) rows.set(key, {
+      name: p.pl?.name || t('noPLShort'), id: p.pl_user_id,
+      total: 0, confirmed: 0, skipped: 0, open: 0, noContacts: 0 });
+    const r = rows.get(key);
+    r.total++;
+    const wp = wpOf(p.id);
+    if (!wp) { r.open++; }
+    else if (wp.review_status === 'confirmed') r.confirmed++;
+    else if (wp.review_status === 'skipped') r.skipped++;
+    else r.open++;
+    if (!p.survey_paused && activeLinks(p.id).length === 0) r.noContacts++;
+  }
+  const data = [...rows.values()];
+  if (!data.length) { setHtml('list', `<div class="empty">${t('emptyProgress')}</div>`); return; }
+
+  const sorters = {
+    name:       (a, b) => a.name.localeCompare(b.name),
+    total:      (a, b) => b.total - a.total,
+    confirmed:  (a, b) => b.confirmed - a.confirmed,
+    skipped:    (a, b) => b.skipped - a.skipped,
+    open:       (a, b) => b.open - a.open || b.noContacts - a.noContacts,
+    noContacts: (a, b) => b.noContacts - a.noContacts,
+  };
+  data.sort(sorters[progSort] || sorters.open);
+
+  const cols = [['name', t('thPL'), ''], ['total', t('thTotal'), ''],
+                ['confirmed', t('thConfirmed'), ''], ['skipped', t('thSkipped'), ''],
+                ['open', t('thOpen'), 'open-n'], ['noContacts', t('thNoContacts'), '']];
+  setHtml('list', `<table class="progress">
+    <thead><tr>${cols.map(([k, l]) =>
+      `<th class="${progSort===k?'sorted':''}" onclick="progSort='${k}';render()">${l}</th>`).join('')}</tr></thead>
+    <tbody>${data.map(r => `
+      <tr class="row ${r.open===0?'done':''}" onclick="jumpToPL('${r.id || 'none'}')">
+        ${cols.map(([k, , cls]) => `<td class="${cls}">${k==='name'
+          ? esc(r.name) + (r.open===0 ? ' ✓' : '')
+          : r[k]}</td>`).join('')}
+      </tr>`).join('')}</tbody></table>`);
+}
+function jumpToPL(id) {
+  setStep('all');                 // rendert einmal, damit das Dropdown existiert
+  const sel = $('pl-filter');
+  if (sel) { sel.value = id === 'none' ? 'none' : id; }
+  sortBy = 'status';
+  render();
+}
+
+/* --------- Kontakte aus anderem Projekt uebernehmen --------- */
+function copySourcesFor(p) {
+  const own = new Set(linksOf(p.id).map(l => l.contact.id));
+  return projects
+    .map(o => {
+      if (o.id === p.id) return null;
+      const cand = activeLinks(o.id).filter(l => !own.has(l.contact.id));
+      if (!cand.length) return null;
+      const sameCustomer = !!(p.customer_number && o.customer_number
+                              && p.customer_number === o.customer_number);
+      return { id: o.id, project_number: o.project_number, project_name: o.project_name,
+               customer_name: o.customer_name, n: cand.length, sameCustomer };
+    })
+    .filter(Boolean)
+    .sort((a, b) => (b.sameCustomer - a.sameCustomer)
+                 || a.project_number.localeCompare(b.project_number));
+}
+function showCopyContacts(pid) {
+  const src = $(`cp-${pid}`).value;
+  const box = $(`cplist-${pid}`);
+  if (!src) { box.innerHTML = ''; return; }
+  const own = new Set(linksOf(pid).map(l => l.contact.id));
+  const cand = activeLinks(src).filter(l => !own.has(l.contact.id));
+  box.innerHTML = cand.map(l => `
+    <label class="cand">
+      <input type="checkbox" value="${l.contact.id}" checked>
+      <span>${esc(l.contact.first_name)} ${esc(l.contact.last_name)}</span>
+      <span class="mail">${esc(l.contact.email)}</span>
+    </label>`).join('')
+    + `<div class="foot">
+         <button onclick="copyContacts('${pid}')">${t('copyTake')}</button>
+         <span class="hint">${t('copyAvail', {n: cand.length})}</span>
+       </div>`;
+}
+async function copyContacts(pid) {
+  const box = $(`cplist-${pid}`);
+  const ids = [...box.querySelectorAll('input[type=checkbox]:checked')].map(i => i.value);
+  if (!ids.length) return toast(t('tNoContactsSel'), true);
+  const rows = ids.map(cid => ({ project_id: pid, contact_id: cid, status: 'active', added_by: me.id }));
+  const { error } = await db.from('project_contacts').upsert(rows, { onConflict: 'project_id,contact_id' });
+  if (error) return toast(t('errCopy') + error.message, true);
+  toast(t('tCopied', {n: ids.length}));
+  openIds.add(pid); justEdited.add(pid); await reload();
+}
+
+/* --------- Admin: dauerhafter Ausschluss --------- */
+async function excludeProject(pid) {
+  const reason = prompt(t('askExclProject'));
+  if (reason === null) return;
+  const { error } = await db.from('projects')
+    .update({ survey_excluded: true, survey_excluded_reason: reason || null }).eq('id', pid);
+  error ? toast(error.message, true) : toast(t('tExcluded'));
+  await reload();
+}
+async function unexclude(pid) {
+  const { error } = await db.from('projects')
+    .update({ survey_excluded: false, survey_excluded_reason: null }).eq('id', pid);
+  error ? toast(error.message, true) : toast(t('tUnexcluded'));
+  await reload();
+}
+async function excludeBulk() {
+  if (!selIds.size) return toast(t('tNoneSelected'), true);
+  const reason = prompt(t('askExclBulk', {n: selIds.size}));
+  if (reason === null) return;
+  const { error } = await db.from('projects')
+    .update({ survey_excluded: true, survey_excluded_reason: reason || null }).in('id', [...selIds]);
+  if (error) return toast(error.message, true);
+  toast(t('tBulkExcluded', {n: selIds.size}));
+  selIds.clear(); await reload();
+}
+
+/* --------- Admin: Massenzuweisung --------- */
+function toggleSel(pid, ev) {
+  ev.stopPropagation();
+  selIds.has(pid) ? selIds.delete(pid) : selIds.add(pid);
+  render();
+}
+function selectAllVisible() {
+  const allSelected = visibleIds.length && visibleIds.every(id => selIds.has(id));
+  visibleIds.forEach(id => allSelected ? selIds.delete(id) : selIds.add(id));
+  render();
+}
+async function assignBulk() {
+  const to = $('bulk-pl').value;
+  if (!to) return toast(t('tChoosePerson'), true);
+  if (!selIds.size) return toast(t('tNoneSelected'), true);
+  const u = users.find(x => x.id === to);
+  if (!confirm(t('confirmAssign', {n: selIds.size, name: u.name}))) return;
+  const { data, error } = await db.rpc('assign_projects', { p_projects: [...selIds], p_to: to });
+  if (error) return toast(error.message, true);
+  toast(t('tAssigned', {n: data ?? selIds.size, name: u.name}));
+  selIds.clear(); await reload();
+}
+
+/* --------- Suche: Praefixe + unscharfer Abgleich ---------
+   kunde:  projekt:  nr:  pl:  kategorie:  — beliebig kombinierbar,
+   alles ohne Praefix sucht ueber alle Felder. Alle Teile muessen passen. */
+const FIELD_MAP = {
+  kunde:     p => p.customer_name || '',
+  kunde2:    p => p.customer_number || '',
+  projekt:   p => p.project_name || '',
+  nr:        p => p.project_number || '',
+  nummer:    p => p.project_number || '',
+  pl:        p => p.pl?.name || '',
+  kategorie: p => p.category || '',
+};
+function matchQuery(query, p) {
+  const q = (query || '').trim();
+  if (!q) return true;
+  const parts = q.match(/\S+/g) || [];
+  const freeWords = [];
+  for (const part of parts) {
+    const m = part.match(/^([a-zA-Zä-ü]+):(.*)$/);
+    if (m && FIELD_MAP[m[1].toLowerCase()]) {
+      const val = m[2];
+      if (!val) continue;                       // "kunde:" allein ignorieren
+      const key = m[1].toLowerCase();
+      let hay = FIELD_MAP[key](p);
+      if (key === 'kunde') hay += ' ' + (p.customer_number || '');
+      if (!fuzzyMatch(val, hay)) return false;
+    } else {
+      freeWords.push(part);
+    }
+  }
+  if (!freeWords.length) return true;
+  const all = [p.project_number, p.project_name, p.customer_name, p.customer_number,
+               p.pl?.name, p.category].filter(Boolean).join(' ');
+  return fuzzyMatch(freeWords.join(' '), all);
+}
+
+/* --------- Unscharfe Suche --------- */
+function norm(s) {
+  return (s || '').toLowerCase()
+    .replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue').replace(/ß/g,'ss')
+    .replace(/[^a-z0-9 ]/g,' ');
+}
+function lev(a, b, max) { // Levenshtein mit Abbruchgrenze
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  let prev = [...Array(b.length + 1).keys()];
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i]; let best = i;
+    for (let j = 1; j <= b.length; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j-1] + 1, prev[j-1] + (a[i-1] === b[j-1] ? 0 : 1));
+      best = Math.min(best, cur[j]);
+    }
+    if (best > max) return max + 1;
+    prev = cur;
+  }
+  return prev[b.length];
+}
+function fuzzyMatch(query, haystack) {
+  const q = norm(query).trim();
+  if (!q) return true;
+  const hayWords = norm(haystack).split(/\s+/).filter(Boolean);
+  const hayFull = hayWords.join(' ');
+  return q.split(/\s+/).every(tok => {
+    if (hayFull.includes(tok)) return true;              // Teilstring reicht
+    if (/^\d+$/.test(tok)) return false;                 // Zahlen exakt: keine Toleranz
+    const tol = tok.length > 7 ? 2 : tok.length > 3 ? 1 : 0;
+    if (!tol) return false;
+    return hayWords.some(w => {
+      if (Math.abs(w.length - tok.length) <= tol && lev(tok, w, tol) <= tol) return true;
+      // Tippfehler am Wortanfang (Praefix-Vergleich)
+      return w.length >= tok.length && lev(tok, w.slice(0, tok.length), tol) <= tol;
+    });
+  });
+}
+
+/* ---------------- Utilities ---------------- */
+function esc(s) { return (s ?? '').toString().replace(/[&<>"']/g, m =>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+let toastTimer;
+function toast(t, err) {
+  const el = $('toast'); el.textContent = t; el.className = err ? 'err' : '';
+  el.style.display = 'block'; clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.style.display = 'none', 3500);
+}
+function langSwitchHtml() {
+  return ['de','en'].map(l => `<button class="${LANG===l?'on':''}" onclick="setLang('${l}')">${l.toUpperCase()}</button>`).join('');
+}
+const setTxt  = (id, v) => { const e = $(id); if (e) e.textContent = v; };
+const setHtml = (id, v) => { const e = $(id); if (e) e.innerHTML = v; };
+const setPh   = (id, v) => { const e = $(id); if (e) e.placeholder = v; };
+const setDisp = (id, v) => { const e = $(id); if (e) e.style.display = v; };
+function applyStaticTexts() {
+  document.documentElement.lang = LANG;
+  document.title = t('title');
+  setHtml('langsw-login', langSwitchHtml());
+  setHtml('langsw-app', langSwitchHtml());
+  setTxt('login-intro', t('loginIntro'));
+  setPh('email', t('emailPh'));
+  setTxt('btn-send', t('sendCode'));
+  setTxt('code-sent', t('codeSent'));
+  setPh('code', t('codePh'));
+  setTxt('btn-verify', t('signIn'));
+  setTxt('btn-other', t('otherEmail'));
+  setTxt('btn-logout', t('logout'));
+  setPh('search', t('searchPh'));
+  setTxt('intro-summary', t('introSummary'));
+  setHtml('intro-body',
+    `<p>${t('introP1')}</p><ol><li>${t('introS1')}</li><li>${t('introS2')}</li><li>${t('introS3')}</li></ol><p>${t('introP2')}</p>`);
+  if (me) setTxt('who-name', me.name + (isAdmin() ? ' · ' + t('adminView') : ''));
+}
+applyStaticTexts();
+boot();
+</script>
+</body>
+</html>
